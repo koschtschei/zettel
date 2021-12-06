@@ -1,33 +1,22 @@
 " Return a string representing an ID usable for a new note
-function! notoire#get_next_note_id()
-  let existing_ids = notoire#get_id_existing_notes()
-  let biggest_id = 0
-
-  " go through all existing ids to find the biggest one
-  for id_str in existing_ids
-    let id_num = str2nr(id_str, 16)
-    if id_num > biggest_id
-      let biggest_id = id_num
-    endif
-  endfor
-
-  return printf("%x", biggest_id + 1)
+function! zettel#get_next_note_id()
+  return strftime("%Y%m%d%H%M")
 endfunction
 
 " Return the list of IDs matching the notes in the note folder
-function! notoire#get_id_existing_notes()
+function! zettel#get_id_existing_notes()
   let note_ids = []
 
-  let filenames = system("ls -1 " . g:current_notoire_folder)
+  let filenames = system("ls -1 " . g:current_zettel_folder)
   let filenames = split(filenames, "\n")
 
   " check the filename is indeed a note and if yes keep only the id
   for i in range(0, len(filenames) - 1)
-    if fnamemodify(filenames[i], ":e") == g:notoire_file_extension[1:-1]
+    if fnamemodify(filenames[i], ":e") == g:zettel_file_extension[1:-1]
       let root = fnamemodify(filenames[i], ":r")
-      let match_hex = matchstr(root, '\x\+')
+      let match_hex = matchstr(root, '\d\+')
       if len(match_hex) == len(root)
-        call add(note_ids, root)
+        call add(zettel_ids, root)
       endif
     endif
   endfor
@@ -36,22 +25,22 @@ function! notoire#get_id_existing_notes()
 endfunction
 
 " Check for various potential issues with the current setup
-function! notoire#check_health()
+function! zettel#check_health()
   " TODO find links that do not link anywhere
   " TODO check for empty notes
   echo "TODO - Should be performing the check"
 endfunction
 
 " Return the full path for a note based on the filename
-function! notoire#get_full_path(note_name)
-  return g:current_notoire_folder . a:note_name . g:notoire_file_extension
+function! zettel#get_full_path(zettel_name)
+  return g:current_zettel_folder . a:zettel_name . g:zettel_file_extension
 endfunction
 
 
 " --- LINK FUNCTIONS --------------------------------------------------------
 
 " Move the cursor to the next or previous link in the buffer
-function! notoire#go_to_link(search_flags)
+function! zettel#go_to_link(search_flags)
   let save_cursor = getcurpos()
 
   " Searching backward will not exclude the first match as long as it doesn't
@@ -71,7 +60,7 @@ function! notoire#go_to_link(search_flags)
 endfunction
 
 " Return the entire link (text included) under the cursor or -1 if there isn't
-function! notoire#get_link_under_cursor()
+function! zettel#get_link_under_cursor()
   let cur_col = col('.')
   let cur_line = getline('.')
   let temp_col = 0
@@ -93,19 +82,19 @@ function! notoire#get_link_under_cursor()
 endfunction
 
 " Go to the next link in the note. Repeated 'count' times
-function! notoire#next_link(count)
+function! zettel#next_link(count)
   let c = str2nr(a:count)
   while c > 0
-    call notoire#go_to_link('')
+    call zettel#go_to_link('')
     let c -= 1
   endwhile
 endfunction
 
 " Go to the previous link in the note. Repeated 'count' times
-function! notoire#prev_link(count)
+function! zettel#prev_link(count)
   let c = str2nr(a:count)
   while c > 0
-    call notoire#go_to_link('b')
+    call zettel#go_to_link('b')
     let c -= 1
   endwhile
 endfunction
@@ -114,19 +103,19 @@ endfunction
 " --- OPEN FUNCTIONS --------------------------------------------------------
 
 " Open the link under the cursor
-function! notoire#open_link(cmd)
-  let link = notoire#get_link_under_cursor()
+function! zettel#open_link(cmd)
+  let link = zettel#get_link_under_cursor()
   if link != -1
     " keep only id part of link with parenthesis
-    let note_id = matchstr(link, '(\x\+.*\x*)$')
+    let zettel_id = matchstr(link, '(\x\+.*\x*)$')
     " remove parenthesis
-    let note_id = note_id[1:-2]
+    let zettel_id = zettel_id[1:-2]
     " remove any potential file extension
-    let note_id = matchstr(note_id, '^\x\+')
+    let zettel_id = matchstr(zettel_id, '^\x\+')
 
     "if we found the note to open, update the history and open the note
-    if note_id != ""
-      call notoire#open_file(a:cmd, notoire#get_full_path(note_id))
+    if zettel_id != ""
+      call zettel#open_file(a:cmd, zettel#get_full_path(zettel_id))
     else
       echom "Error: cannot open note for link " . link
     endif
@@ -134,20 +123,20 @@ function! notoire#open_link(cmd)
 endfunction
 
 " Open or create the index file (always note 0)
-function! notoire#open_index(cmd)
-  call notoire#open_file(a:cmd, notoire#get_full_path("/0"))
+function! zettel#open_index(cmd)
+  call zettel#open_file(a:cmd, zettel#get_full_path("/0"))
 endfunction
 
 
 " --- SEARCH FUNCTIONS -------------------------------------------------------
 
 " Search or create a new note with FZF
-function! notoire#search_notes(cmd)
-  call notoire#run_fzf(notoire#notes_content(), a:cmd, 0)
+function! zettel#search_notes(cmd)
+  call zettel#run_fzf(zettel#notes_content(), a:cmd, 0)
 endfunction
 
 " List all the links present in the current note
-function! notoire#search_links_in_note(cmd)
+function! zettel#search_links_in_note(cmd)
   let cur_file = expand('%:p')
   if cur_file == ""
     return
@@ -168,31 +157,31 @@ function! notoire#search_links_in_note(cmd)
     let id_info = matchstrpos(link, '(\x\{-}.*\x*)$')
 
     let remove_from_end = 2
-    if g:notoire_display_file_extension == 1
-      let remove_from_end = remove_from_end + strlen(g:notoire_file_extension)
+    if g:zettel_display_file_extension == 1
+      let remove_from_end = remove_from_end + strlen(g:zettel_file_extension)
     endif
     let id_part = id_info[0][1:-remove_from_end] . " "
     let text_part = link[0:id_info[1] - 1]
     let links[i] = id_part . text_part
   endfor
 
-  call notoire#run_fzf(links, a:cmd, 0)
+  call zettel#run_fzf(links, a:cmd, 0)
 endfunction
 
 " List all the notes linking to the current one
-function! notoire#search_notes_linking_here(cmd)
+function! zettel#search_notes_linking_here(cmd)
   let cur_file = expand('%:t:r')
   if cur_file == ""
     return
   endif
 
   " add the file extension if the corresponding option is set
-  if g:notoire_display_file_extension == 1
-    let cur_file = cur_file . g:notoire_file_extension
+  if g:zettel_display_file_extension == 1
+    let cur_file = cur_file . g:zettel_file_extension
   endif
 
   " use external command rg to find links to the current note
-  let results = system('rg -e "\[.+?\]\('.cur_file.'\)" '.g:current_notoire_folder.'/*'.g:notoire_file_extension)
+  let results = system('rg -e "\[.+?\]\('.cur_file.'\)" '.g:current_zettel_folder.'/*'.g:zettel_file_extension)
   let results = split(results, "\n")
 
   " format the rg results to use as input of fzf
@@ -205,21 +194,21 @@ function! notoire#search_notes_linking_here(cmd)
     let results[i] = res_filename . " " . res_parts[1]
   endfor
 
-  call notoire#run_fzf(results, a:cmd, 0)
+  call zettel#run_fzf(results, a:cmd, 0)
 endfunction
 
 " List all the notes that are not linked anywhere
-function! notoire#search_orphan_notes(cmd)
+function! zettel#search_orphan_notes(cmd)
   let linked_ids = []   " note ids that are present in a link somewhere
   let orphan_ids = []   " ids for notes that are not linked to anywhere
   let fzf_source = []   " list of strings used as source for fzf
 
   " perform a regex search once to get all links in every note
   let extension_for_search = ""
-  if g:notoire_display_file_extension == 1
-    let extension_for_search = g:notoire_file_extension
+  if g:zettel_display_file_extension == 1
+    let extension_for_search = g:zettel_file_extension
   endif
-  let links = system('rg -oIN -e "\[.+?\]\([1-9a-f]+'.extension_for_search.'?\)" '.g:current_notoire_folder.'/*'.g:notoire_file_extension)
+  let links = system('rg -oIN -e "\[.+?\]\([1-9a-f]+'.extension_for_search.'?\)" '.g:current_zettel_folder.'/*'.g:zettel_file_extension)
   let links = split(links, "\n")
 
   " strip those links to keep only the note id
@@ -227,8 +216,8 @@ function! notoire#search_orphan_notes(cmd)
     let id_info = matchstrpos(links[i], '(\x\{-}.*\x*)$')
 
     let remove_from_end = 2
-    if g:notoire_display_file_extension == 1
-      let remove_from_end = remove_from_end + strlen(g:notoire_file_extension)
+    if g:zettel_display_file_extension == 1
+      let remove_from_end = remove_from_end + strlen(g:zettel_file_extension)
     endif
     let note_id = id_info[0][1:-remove_from_end]
 
@@ -236,7 +225,7 @@ function! notoire#search_orphan_notes(cmd)
   endfor
 
   " check for each note if it is referenced in a link or not
-  let note_ids = notoire#get_id_existing_notes()
+  let note_ids = zettel#get_id_existing_notes()
   for i in range(0, len(note_ids) - 1)
     if index(linked_ids, note_ids[i]) == -1
       call add(orphan_ids, note_ids[i])
@@ -246,11 +235,11 @@ function! notoire#search_orphan_notes(cmd)
   " format the results to be used as source for fzf
   for i in range(0, len(orphan_ids) - 1)
     let id = orphan_ids[i]
-    let entry = id . " " . system('head -n 1 ' . g:current_notoire_folder.id.g:notoire_file_extension)
+    let entry = id . " " . system('head -n 1 ' . g:current_zettel_folder.id.g:zettel_file_extension)
     call add(fzf_source, entry)
   endfor
 
-  call notoire#run_fzf(fzf_source, a:cmd, 0)
+  call zettel#run_fzf(fzf_source, a:cmd, 0)
 endfunction
 
 
@@ -258,15 +247,15 @@ endfunction
 
 " Return a list where each item is the content of a note. Formatted in a way
 " that it can be used as a source for FZF
-function! notoire#notes_content()
-  let note_ids = notoire#get_id_existing_notes()
+function! zettel#notes_content()
+  let note_ids = zettel#get_id_existing_notes()
   let content = []
 
   for i in range(0, len(note_ids) - 1)
-    let toAdd = note_ids[i]." ".system("cat ".g:current_notoire_folder.note_ids[i].g:notoire_file_extension)
+    let toAdd = note_ids[i]." ".system("cat ".g:current_zettel_folder.note_ids[i].g:zettel_file_extension)
     call add(content, toAdd)
   endfor
-  
+
   call add(content, "NEW - select to create new note")
   return content
 endfunction
@@ -278,18 +267,18 @@ endfunction
 " 1 - create link with visual selection
 " 2 - create link without visual selection
 " param e is the selection of FZF. The first word is the id of the note
-function! notoire#process_fzf_choice(cmd, link_creation, e)
+function! zettel#process_fzf_choice(cmd, link_creation, e)
   let note_id = split(a:e)[0]
 
   if note_id == "NEW"
-    let note_id = notoire#get_next_note_id()
+    let note_id = zettel#get_next_note_id()
   endif
 
   " there is an option to add file extension to note id in the links
   " which means we need to handle specificaly the note id that is displayed
   let displayed_note_id = note_id
-  if g:notoire_display_file_extension == 1
-    let displayed_note_id = note_id . g:notoire_file_extension
+  if g:zettel_display_file_extension == 1
+    let displayed_note_id = note_id . g:zettel_file_extension
   endif
 
   " if we choose to create a link with visual selection
@@ -301,33 +290,33 @@ function! notoire#process_fzf_choice(cmd, link_creation, e)
     exe "normal! \ei[](" . displayed_note_id . ")\eF]"
   endif
 
-  call notoire#open_file(a:cmd, g:current_notoire_folder."/".note_id.g:notoire_file_extension)
+  call zettel#open_file(a:cmd, g:current_zettel_folder."/".note_id.g:zettel_file_extension)
 endfunction
 
 " Return a string with the options to use when running fzf
-function! notoire#get_fzf_opt()
+function! zettel#get_fzf_opt()
   let o_pw = " --preview-window=down:60%:wrap"
-  let o_p_base = "fmt {1}" . g:notoire_file_extension
+  let o_p_base = "fmt {1}" . g:zettel_file_extension
   let o_p = ' --preview="' . o_p_base . '"'
   let o_base = ' -e +m --cycle'
   let o_dsp = ' --no-bold --info="inline"'
   let o_col = " --color=border:#FF8888,hl:#FFF714,hl+:#FFF714"
 
   " apply user defined color scheme if it exists
-  if exists('g:notoire_color')
-    let o_col = " " . g:notoire_color
+  if exists('g:zettel_color')
+    let o_col = " " . g:zettel_color
   endif
 
   return o_base . o_dsp . o_p . o_pw . o_col
 endfunction
 
 " Search for a note in all notes
-function! notoire#run_fzf(source, cmd, link_creation)
+function! zettel#run_fzf(source, cmd, link_creation)
   call fzf#run({
     \ 'source': a:source,
-    \ 'sink': function('notoire#process_fzf_choice', [a:cmd, a:link_creation]),
-    \ 'dir': g:current_notoire_folder,
-    \ 'options': notoire#get_fzf_opt()
+    \ 'sink': function('zettel#process_fzf_choice', [a:cmd, a:link_creation]),
+    \ 'dir': g:current_zettel_folder,
+    \ 'options': zettel#get_fzf_opt()
   \ })
 endfunction
 
@@ -335,7 +324,7 @@ endfunction
 " --- HISTORY FUNCTIONS -----------------------------------------------------
 
 " Open a file and update associated history
-function! notoire#open_file(cmd, filename)
+function! zettel#open_file(cmd, filename)
   let new_history = getbufvar("%", "history", []) " get history of current buf
   call add (new_history, expand("%:p"))           " append filename of cur buf
 
@@ -351,7 +340,7 @@ function! notoire#open_file(cmd, filename)
 endfunction
 
 " Go to the previous note in the history
-function! notoire#prev_note(cmd)
+function! zettel#prev_note(cmd)
   let history = getbufvar("%", "history", []) " get history of current buf
   if len(history) <= 0                        " if no history we quit
     return
@@ -367,8 +356,8 @@ endfunction
 " --- CREATE FUNCTIONS ------------------------------------------------------
 
 " Create a new note from selection and open it
-function! notoire#create_note(cmd)
-  let note_id = notoire#get_next_note_id()
+function! zettel#create_note(cmd)
+  let note_id = zettel#get_next_note_id()
 
   " delete the visual selection and write the empty link in place of
   let save_a = @a
@@ -376,7 +365,7 @@ function! notoire#create_note(cmd)
   exe "normal! \ei[](" . note_id . ")\eF]"
 
   " open the new note and paste content
-  call notoire#open_file(a:cmd, notoire#get_full_path("/".note_id))
+  call zettel#open_file(a:cmd, zettel#get_full_path("/".note_id))
   exe "normal! \"ap"
   write
 
@@ -384,37 +373,37 @@ function! notoire#create_note(cmd)
 endfunction
 
 " Create a new empty note and open it
-function! notoire#create_empty_note(cmd)
-  let note_id = notoire#get_next_note_id()
-  call notoire#open_file(a:cmd, notoire#get_full_path("/".note_id))
+function! zettel#create_empty_note(cmd)
+  let note_id = zettel#get_next_note_id()
+  call zettel#open_file(a:cmd, zettel#get_full_path("/".note_id))
 endfunction
 
 " Create link to a note (selected through search or new) where the text is the
 " visual selection
-function! notoire#create_link(cmd)
-  call notoire#run_fzf(notoire#notes_content(), a:cmd, 1)
+function! zettel#create_link(cmd)
+  call zettel#run_fzf(zettel#notes_content(), a:cmd, 1)
 endfunction
 
 " Create link without text to a note (selected through search or new)
-function! notoire#create_empty_link(cmd)
-  call notoire#run_fzf(notoire#notes_content(), a:cmd, 2)
+function! zettel#create_empty_link(cmd)
+  call zettel#run_fzf(zettel#notes_content(), a:cmd, 2)
 endfunction
 
 
 " --- FOLDER FUNCTIONS ------------------------------------------------------
 
-function! notoire#open_folder(path)
-  let g:current_notoire_folder = a:path
-  if g:current_notoire_folder[-1] != '/'
-    let g:current_notoire_folder = g:current_notoire_folder . '/'
+function! zettel#open_folder(path)
+  let g:current_zettel_folder = a:path
+  if g:current_zettel_folder[-1] != '/'
+    let g:current_zettel_folder = g:current_zettel_folder . '/'
   endif
-  call notoire#open_index("edit")
+  call zettel#open_index("edit")
 endfunction
 
-function! notoire#select_folder()
+function! zettel#select_folder()
   call fzf#run({
-    \ 'source': g:notoire_folders,
-    \ 'sink': function('notoire#open_folder'),
+    \ 'source': g:zettel_folders,
+    \ 'sink': function('zettel#open_folder'),
     \ 'options': ' -e +m --cycle --color=border:#FF8888,hl:#FFF714,hl+:#FFF714'
   \ })
 endfunction

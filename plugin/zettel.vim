@@ -103,7 +103,7 @@ endif
 
 
 if exists('g:zettel_file_extension') == 0
-  let g:zettel_file_extension = 'md'
+  let g:zettel_file_extension = '.md'
 elseif g:zettel_file_extension[0] != '.'
   let g:zettel_file_extension = '.' . g:zettel_file_extension
 endif

@@ -5,7 +5,7 @@ endfunction
 
 " Return the list of IDs matching the notes in the note folder
 function! zettel#get_id_existing_notes()
-  let note_ids = []
+  let zettel_ids = []
 
   let filenames = system("ls -1 " . g:current_zettel_folder)
   let filenames = split(filenames, "\n")
@@ -21,7 +21,7 @@ function! zettel#get_id_existing_notes()
     endif
   endfor
 
-  return note_ids
+  return zettel_ids
 endfunction
 
 " Check for various potential issues with the current setup
